@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuestro Mapa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap');
+  :root{
+    --ink:#0c1524; --gold:#e6b768; --gold-dim:#a3854f;
+    --cream:#f3ecda; --cream-dim:#c9c0a8; --line:rgba(230,183,104,0.25); --danger:#c96a5a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--ink);font-family:'Manrope',sans-serif;color:var(--cream);overflow:hidden;}
+  #app{display:flex;height:100vh;width:100vw;}
+  #sidebar{width:340px;min-width:340px;background:linear-gradient(180deg,#0c1524 0%,#0a1220 100%);
+    border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:10;
+    box-shadow:8px 0 24px rgba(0,0,0,0.35);}
+  #sidebar-header{padding:28px 24px 18px;border-bottom:1px solid var(--line);position:relative;}
+  #sidebar-header::before{content:'';position:absolute;top:14px;right:22px;width:6px;height:6px;
+    border-radius:50%;background:var(--gold);box-shadow:0 0 8px 2px var(--gold);}
+  h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-style:italic;font-size:30px;
+    margin:0 0 4px;color:var(--cream);}
+  #subtitle{font-size:12.5px;color:var(--cream-dim);line-height:1.5;}
+  #signature{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;
+    color:var(--gold-dim);letter-spacing:1px;margin-top:10px;}
+  #signature .amp{color:var(--gold);}
+  #ambient-btn{width:100%;padding:10px;margin-top:10px;background:transparent;
+    border:1px solid var(--line);color:var(--cream-dim);font-family:'Manrope',sans-serif;
+    font-weight:500;font-size:12px;border-radius:3px;cursor:pointer;transition:all 0.25s;}
+  #ambient-btn:hover{border-color:var(--gold-dim);color:var(--gold);}
+  #ambient-btn.playing{background:rgba(230,183,104,0.12);border-color:var(--gold-dim);color:var(--gold);}
+
+  #special-banner{
+    position:fixed;top:0;left:0;right:0;z-index:2500;
+    background:linear-gradient(180deg,rgba(15,26,44,0.97),rgba(15,26,44,0.9));
+    border-bottom:1px solid var(--gold-dim);padding:16px 20px;text-align:center;
+    display:none;
+  }
+  #special-banner.show{display:block;}
+  #special-banner .sb-count{font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:20px;color:var(--gold);margin-bottom:4px;}
+  #special-banner .sb-count b{font-size:24px;}
+  #special-banner .sb-phrase{font-size:12.5px;color:var(--cream-dim);letter-spacing:0.3px;}
+  #special-banner .sb-close{position:absolute;top:12px;right:16px;background:none;border:none;
+    color:var(--cream-dim);font-size:18px;cursor:pointer;line-height:1;}
+  #map-watermark{position:absolute;bottom:20px;left:20px;z-index:1000;
+    font-family:'Cormorant Garamond',serif;font-style:italic;font-size:12px;
+    color:rgba(230,183,104,0.6);letter-spacing:1px;pointer-events:none;user-select:none;
+    text-shadow:0 1px 4px rgba(0,0,0,0.8);}
+  #memlist{flex:1;overflow-y:auto;padding:8px 0;}
+  .memitem{display:flex;gap:14px;padding:14px 24px;cursor:pointer;
+    border-bottom:1px solid rgba(230,183,104,0.08);transition:background 0.2s;}
+  .memitem:hover{background:rgba(230,183,104,0.06);}
+  .memnum{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--gold);min-width:26px;font-style:italic;}
+  .meminfo .memtitle{font-size:14.5px;font-weight:600;margin-bottom:3px;}
+  .meminfo .memdate{font-size:11px;color:var(--gold-dim);text-transform:uppercase;}
+  .memempty{padding:40px 24px;text-align:center;color:var(--cream-dim);font-size:13px;line-height:1.7;}
+  #sidebar-footer{padding:18px 24px 22px;border-top:1px solid var(--line);}
+  #add-btn{width:100%;padding:13px;background:transparent;border:1px solid var(--gold-dim);
+    color:var(--gold);font-weight:600;font-size:13px;border-radius:3px;cursor:pointer;transition:all 0.25s;}
+  #add-btn:hover{background:var(--gold);color:var(--ink);}
+  #add-btn.active-mode{background:var(--gold);color:var(--ink);}
+  #hint{font-size:11px;color:var(--cream-dim);margin-top:9px;text-align:center;min-height:14px;}
+  #map{flex:1;height:100vh;position:relative;}
+  .leaflet-container{
+    font-family:'Manrope',sans-serif;
+    background:
+      radial-gradient(1px 1px at 6% 10%, rgba(255,255,255,0.55) 50%, transparent),
+      radial-gradient(1px 1px at 18% 28%, rgba(255,255,255,0.35) 50%, transparent),
+      radial-gradient(1.5px 1.5px at 33% 6%, rgba(255,255,255,0.5) 50%, transparent),
+      radial-gradient(1px 1px at 47% 21%, rgba(255,255,255,0.4) 50%, transparent),
+      radial-gradient(1px 1px at 61% 42%, rgba(255,255,255,0.3) 50%, transparent),
+      radial-gradient(1.5px 1.5px at 9% 55%, rgba(255,255,255,0.45) 50%, transparent),
+      radial-gradient(1px 1px at 27% 68%, rgba(255,255,255,0.35) 50%, transparent),
+      radial-gradient(1px 1px at 44% 60%, rgba(255,255,255,0.4) 50%, transparent),
+      radial-gradient(1.5px 1.5px at 72% 74%, rgba(255,255,255,0.5) 50%, transparent),
+      radial-gradient(1px 1px at 84% 15%, rgba(255,255,255,0.3) 50%, transparent),
+      radial-gradient(1px 1px at 93% 51%, rgba(255,255,255,0.35) 50%, transparent),
+      radial-gradient(1px 1px at 4% 85%, rgba(255,255,255,0.35) 50%, transparent),
+      radial-gradient(1px 1px at 58% 90%, rgba(255,255,255,0.3) 50%, transparent),
+      radial-gradient(1.5px 1.5px at 96% 88%, rgba(255,255,255,0.4) 50%, transparent),
+      radial-gradient(ellipse at 30% 40%, rgba(230,183,104,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse at 75% 70%, rgba(230,183,104,0.04) 0%, transparent 55%),
+      #0a1220;
+    background-size:100% 100%;
+  }
+  .leaflet-tile-pane{filter:invert(1) hue-rotate(190deg) brightness(0.82) contrast(1) saturate(0.55);}
+  .star-pin{filter:drop-shadow(0 0 5px rgba(230,183,104,0.9));}
+  .overlay{position:fixed;inset:0;background:rgba(6,10,18,0.7);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:1000;}
+  .overlay.show{display:flex;}
+  .modal{width:400px;max-width:90vw;max-height:85vh;overflow-y:auto;background:#0f1a2c;border:1px solid var(--line);
+    border-radius:6px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+  .modal h2{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:600;
+    font-size:24px;margin:0 0 18px;color:var(--gold);}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;color:var(--cream-dim);text-transform:uppercase;margin-bottom:6px;}
+  .field input, .field textarea{width:100%;background:#0a1220;border:1px solid var(--line);
+    color:var(--cream);padding:10px 12px;border-radius:3px;font-size:13.5px;resize:vertical;}
+  .field textarea{min-height:80px;}
+  .field input:focus, .field textarea:focus{outline:none;border-color:var(--gold-dim);}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;}
+  .btn{flex:1;padding:11px;border-radius:3px;border:none;font-weight:600;font-size:13px;cursor:pointer;}
+  .btn-primary{background:var(--gold);color:var(--ink);}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--cream-dim);}
+  .btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+  .view-date{font-size:11px;color:var(--gold-dim);text-transform:uppercase;margin-bottom:12px;}
+  .view-note{font-size:14px;line-height:1.7;white-space:pre-wrap;}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);
+    background:#0f1a2c;border:1px solid var(--gold-dim);color:var(--cream);
+    padding:10px 20px;border-radius:20px;font-size:12.5px;opacity:0;pointer-events:none;
+    transition:all 0.3s;z-index:2000;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #lock-screen{
+    position:fixed;inset:0;z-index:5000;background:#0a1220;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 30% 30%, rgba(230,183,104,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 70%, rgba(230,183,104,0.05) 0%, transparent 55%), #0a1220;
+  }
+  #lock-box{width:320px;max-width:85vw;text-align:center;padding:40px 30px;
+    background:#0f1a2c;border:1px solid var(--line);border-radius:8px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+  #lock-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:600;
+    font-size:28px;color:var(--gold);margin-bottom:6px;}
+  #lock-sub{font-size:12px;color:var(--cream-dim);margin-bottom:26px;letter-spacing:0.5px;}
+  #lock-input{width:100%;background:#0a1220;border:1px solid var(--line);color:var(--cream);
+    padding:12px 14px;border-radius:4px;font-size:14px;text-align:center;letter-spacing:2px;
+    margin-bottom:14px;}
+  #lock-input:focus{outline:none;border-color:var(--gold-dim);}
+  #lock-btn{width:100%;padding:12px;background:var(--gold);color:var(--ink);border:none;
+    border-radius:4px;font-family:'Manrope',sans-serif;font-weight:600;font-size:13px;
+    letter-spacing:0.5px;cursor:pointer;transition:opacity 0.2s;}
+  #lock-btn:hover{opacity:0.85;}
+  #lock-error{font-size:12px;color:var(--danger);margin-top:12px;min-height:14px;}
+
+  @media (max-width:640px){
+    #sidebar{width:100%;min-width:0;position:absolute;height:48%;bottom:0;top:auto;
+      border-top:1px solid var(--line);display:flex;flex-direction:column;}
+    #map{height:52vh;position:absolute;top:0;width:100%;}
+    #app{flex-direction:column;}
+    #sidebar-header{padding:14px 20px 10px;}
+    h1{font-size:22px;}
+    #subtitle{font-size:11px;}
+    #signature{font-size:11px;margin-top:6px;}
+    #memlist{flex:1 1 auto;min-height:60px;}
+    .memitem{padding:10px 20px;}
+    #sidebar-footer{padding:10px 20px 14px;flex-shrink:0;}
+    #add-btn{padding:10px;font-size:12px;}
+    #ambient-btn{padding:8px;font-size:11px;}
+  }
+</style>
+</head>
+<body>
+<div id="lock-screen">
+  <div id="lock-box">
+    <div id="lock-title">Nuestro Mapa</div>
+    <div id="lock-sub">Solo para nosotros dos</div>
+    <input type="password" id="lock-input" placeholder="Contraseña" autocomplete="off">
+    <button id="lock-btn">Entrar</button>
+    <div id="lock-error"></div>
+  </div>
+</div>
+<div id="special-banner">
+  <button class="sb-close" id="sb-close">&times;</button>
+  <div class="sb-count" id="sb-count"></div>
+  <div class="sb-phrase" id="sb-phrase"></div>
+</div>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>Nuestro Mapa</h1>
+      <div id="subtitle">Cada punto es un sitio. Cada línea, el hilo que nos une.</div>
+      <div id="signature">Manu <span class="amp">♥</span> Eli · desde el 19 de julio de 2026</div>
+    </div>
+    <div id="memlist"></div>
+    <div id="sidebar-footer">
+      <button id="add-btn">+ Añadir un recuerdo</button>
+      <div id="hint"></div>
+      <button id="ambient-btn">🌙 Sonido de noche</button>
+    </div>
+  </div>
+  <div id="map">
+    <div id="map-watermark">Manu ♥ Eli</div>
+  </div>
+</div>
+
+<div class="overlay" id="form-overlay">
+  <div class="modal">
+    <h2 id="form-heading">Nuevo recuerdo</h2>
+    <div class="field"><label>Título</label><input type="text" id="f-title" maxlength="60"></div>
+    <div class="field"><label>Fecha</label><input type="date" id="f-date"></div>
+    <div class="field"><label>Nota</label><textarea id="f-note"></textarea></div>
+    <div class="field">
+      <label>Foto (opcional)</label>
+      <input type="file" id="f-photo" accept="image/*">
+      <div id="f-photo-preview" style="margin-top:10px;display:none;">
+        <img id="f-photo-img" style="width:100%;max-height:220px;object-fit:cover;border-radius:4px;display:block;">
+        <button type="button" class="btn btn-ghost" id="f-photo-remove" style="margin-top:8px;">Quitar foto</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="f-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="f-save">Guardar</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="view-overlay">
+  <div class="modal">
+    <h2 id="v-title"></h2>
+    <div class="view-date" id="v-date"></div>
+    <img id="v-photo" style="width:100%;max-height:260px;object-fit:cover;border-radius:4px;margin-bottom:14px;display:none;">
+    <div class="view-note" id="v-note"></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="v-delete">Eliminar</button>
+      <button class="btn btn-ghost" id="v-move">Mover ubicación</button>
+      <button class="btn btn-ghost" id="v-edit">Editar</button>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn btn-ghost" id="v-close">Cerrar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const SITE_PASSWORD = '190726Em';
+(function(){
+  const lockScreen = document.getElementById('lock-screen');
+  const lockInput = document.getElementById('lock-input');
+  const lockBtn = document.getElementById('lock-btn');
+  const lockError = document.getElementById('lock-error');
+
+  if(sessionStorage.getItem('unlocked') === 'yes'){
+    lockScreen.style.display = 'none';
+  }
+  function tryUnlock(){
+    if(lockInput.value === SITE_PASSWORD){
+      sessionStorage.setItem('unlocked', 'yes');
+      lockScreen.style.display = 'none';
+    } else {
+      lockError.textContent = 'Contraseña incorrecta';
+      lockInput.value = '';
+      lockInput.focus();
+    }
+  }
+  lockBtn.addEventListener('click', tryUnlock);
+  lockInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') tryUnlock(); });
+})();
+
+(async function(){
+  const seedMemories = [
+    { id:'s1', lat:36.5937, lng:-4.5254, title:'Donde nos conocimos', date:'2026-07-19',
+      note:'La esperé a que saliera de trabajar en la piscina, a las nueve de la noche. Todavía no habíamos hablado mucho, pero ese día decidimos ver juntos la final del Mundial, sin plan ni compañía ninguno de los dos.' },
+    { id:'s2', lat:36.593054, lng:-4.531504, title:'La noche del Mundial', date:'2026-07-19',
+      note:'Vimos la final juntos en el Auditorio de Benalmádena, en el Parque de la Paloma. Sin plan ni compañía ninguno de los dos. Ahí empezó todo de verdad.' },
+    { id:'s3', lat:36.5903, lng:-4.5273, title:'El primer baño juntos', date:'2026-07-19',
+      note:'Después de la final nos fuimos a bañar a la playa, junto al Maracas. Había una colchoneta en el mar y te pedí que te metieras conmigo — te dio un poco de miedo, pero en el fondo te morías de ganas.' },
+    { id:'s4', lat:36.5764, lng:-4.5736, title:'La hamburguesa y el primer beso', date:'2026-08-03',
+      note:'Hamburguesa después del curro, y luego la playa. Ahí fue el primer beso, el que recuerdo con una claridad que me da hasta vergüenza.' },
+    { id:'s5', lat:36.9220, lng:-3.4090, title:'El apartamento en Carataunas', date:'2026-08-09',
+      note:'Tres días en la Alpujarra. Charlas interminables por la noche en la terraza, mirando la misma estrella una y otra vez, sin querer que se acabara la conversación.' },
+    { id:'s6', lat:37.0024, lng:-3.2666, title:'Mirador Era del Fuerte, Trevélez', date:'2026-08-10',
+      note:'Subimos de noche. El fresquito, las estrellas encima nuestro, y todas las verdades y planes que nos dijimos ahí arriba. El momento más especial de esos tres días.' },
+    { id:'s7', lat:36.5880, lng:-4.5332, title:'La primera noche', date:'2026-08-07',
+      note:'Nuestra primera noche juntos, en los Maite. Nos bebimos una botella de vino árabe que te encanta y no dormimos nada, los dos demasiado nerviosos para cerrar los ojos.' },
+    { id:'s8', lat:36.7524, lng:-3.8756, title:'El Balcón de Europa', date:'2026-08-11',
+      note:'La primera vez que lo viste, camino de vuelta de la Alpujarra. Nos quedamos ahí los dos mirando el Mediterráneo.' },
+    { id:'s9', lat:36.7125, lng:-4.3252, title:'Playa de la Araña', date:'2026-08-11',
+      note:'Nos bañamos juntos y jugamos al vóley con la peor pelota del mundo — me la encontré en el mar, y se volaba con cualquier cosa. Nos reímos un montón igualmente.' },
+    { id:'s10', lat:36.5802, lng:-4.8854, title:'Mirador del Juanar', date:'2026-08-27',
+      note:'Subimos al mirador con la idea de hacer una ruta de campo, y luego bajamos al pueblecito de abajo.' },
+    { id:'s11', lat:36.6575, lng:-4.4783, title:'Nuestra primera película juntos', date:'2026-08-19',
+      note:'Cine en Plaza Mayor, sobre las nueve y media de la noche. Vimos Obsesión y nos reímos muchísimo.' },
+    { id:'s12', lat:36.5882, lng:-4.5812, title:'Mirador de la Estupa', date:'2026-08-19',
+      note:'Después del cine subimos al mirador junto al mariposario, como de costumbre. Viendo las estrellas y contándonos nuestras intimidades.' },
+    { id:'s13', lat:36.5648, lng:-4.8520, title:'Cuevas de Ojén', date:'2026-08-27',
+      note:'Bajando del Juanar paramos en las Cuevas de Ojén, con su mirador pequeño. Nos quedamos ahí un rato, muy chulo el sitio.' }
+  ];
+
+  const SUPABASE_URL = 'https://dhhcayheibotkeagcjgh.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_Qgo9tIg841krHNkw7ToH7A_9N7eIRZv';
+  const SB_HEADERS = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
+
+  let memories = [];
+  let markers = {}; let polyline = null; let addMode = false; let pendingLatLng = null; let activeId = null;
+
+  async function loadMemories(){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/memories?select=*`, { headers: SB_HEADERS });
+      if(!res.ok) throw new Error('fetch failed');
+      const rows = await res.json();
+      if(rows.length === 0){
+        // Base de datos vacía todavía: sembrar con los recuerdos iniciales
+        for(const mem of seedMemories){ await upsertMemory(mem); }
+        memories = seedMemories.slice();
+      } else {
+        memories = rows;
+      }
+    }catch(e){
+      console.error(e);
+      showToast('No se pudo conectar con la base de datos. Revisa tu conexión.');
+      memories = seedMemories.slice();
+    }
+  }
+
+  async function upsertMemory(mem){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/memories`, {
+        method: 'POST',
+        headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(mem)
+      });
+      if(!res.ok) throw new Error('upsert failed');
+      return true;
+    }catch(e){
+      console.error(e);
+      showToast('No se pudo guardar en la base de datos.');
+      return false;
+    }
+  }
+
+  async function deleteMemoryRemote(id){
+    try{
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/memories?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: SB_HEADERS
+      });
+      if(!res.ok) throw new Error('delete failed');
+      return true;
+    }catch(e){
+      console.error(e);
+      showToast('No se pudo eliminar en la base de datos.');
+      return false;
+    }
+  }
+  function showToast(msg){
+    const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2200);
+  }
+  function fmtDate(d){
+    if(!d) return '';
+    const dt = new Date(d+'T00:00:00');
+    return dt.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
+  }
+  function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+
+  const worldBounds = L.latLngBounds([-85,-260],[85,260]);
+  const map = L.map('map', {
+    zoomControl:false,
+    worldCopyJump:false,
+    maxBounds: worldBounds,
+    maxBoundsViscosity: 0.4,
+    minZoom: 1
+  }).setView([36.78,-3.9], 8);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', subdomains:'abc', minZoom:1, maxZoom:19, noWrap:true
+  }).addTo(map);
+
+  function starIcon(){
+    return L.divIcon({ className:'star-pin',
+      html:`<svg width="24" height="24" viewBox="0 0 24 24" fill="#e6b768"><path d="M12 2 L14.5 9 L22 9.5 L16 14.2 L18 22 L12 17.5 L6 22 L8 14.2 L2 9.5 L9.5 9 Z"/></svg>`,
+      iconSize:[24,24], iconAnchor:[12,12] });
+  }
+
+  function rebuildMap(){
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    markers = {};
+    if(polyline) map.removeLayer(polyline);
+    const sorted = [...memories].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    sorted.forEach(mem => {
+      const marker = L.marker([mem.lat, mem.lng], { icon: starIcon() }).addTo(map);
+      marker.on('click', () => openView(mem.id));
+      markers[mem.id] = marker;
+    });
+    if(sorted.length > 1){
+      polyline = L.polyline(sorted.map(m => [m.lat,m.lng]), { color:'#e6b768', weight:1.2, opacity:0.45, dashArray:'2,8' }).addTo(map);
+    }
+    renderList(sorted);
+  }
+
+  function renderList(sorted){
+    const list = document.getElementById('memlist');
+    if(sorted.length === 0){
+      list.innerHTML = `<div class="memempty">Todavía no hay recuerdos. Pulsa "Añadir un recuerdo" y toca el mapa donde queráis dejar el primero.</div>`;
+      return;
+    }
+    list.innerHTML = '';
+    sorted.forEach((mem, idx) => {
+      const el = document.createElement('div'); el.className = 'memitem';
+      el.innerHTML = `<div class="memnum">${idx+1}</div><div class="meminfo">
+        <div class="memtitle">${escapeHtml(mem.title)}</div><div class="memdate">${fmtDate(mem.date)}</div></div>`;
+      el.addEventListener('click', () => {
+        map.flyTo([mem.lat, mem.lng], 17, { duration:2.4 });
+        map.once('moveend', () => openView(mem.id));
+      });
+      list.appendChild(el);
+    });
+  }
+
+  const addBtn = document.getElementById('add-btn'); const hint = document.getElementById('hint');
+  let moveModeId = null;
+  addBtn.addEventListener('click', () => {
+    addMode = !addMode;
+    addBtn.classList.toggle('active-mode', addMode);
+    hint.textContent = addMode ? 'Toca el mapa donde queráis dejar el recuerdo' : '';
+    map.getContainer().style.cursor = addMode ? 'crosshair' : '';
+  });
+  map.on('click', async (e) => {
+    if(moveModeId){
+      const mem = memories.find(m => m.id === moveModeId);
+      if(mem){
+        mem.lat = e.latlng.lat; mem.lng = e.latlng.lng;
+        await upsertMemory(mem); rebuildMap();
+        showToast('Ubicación actualizada');
+      }
+      moveModeId = null;
+      hint.textContent = '';
+      map.getContainer().style.cursor = '';
+      return;
+    }
+    if(!addMode) return;
+    pendingLatLng = e.latlng; addMode = false;
+    addBtn.classList.remove('active-mode'); hint.textContent = '';
+    map.getContainer().style.cursor = ''; openForm();
+  });
+
+  document.getElementById('v-move').addEventListener('click', () => {
+    moveModeId = activeId;
+    viewOverlay.classList.remove('show');
+    hint.textContent = 'Toca el mapa donde debería estar de verdad';
+    map.getContainer().style.cursor = 'crosshair';
+  });
+
+  const formOverlay = document.getElementById('form-overlay');
+  const fTitle = document.getElementById('f-title'), fDate = document.getElementById('f-date'), fNote = document.getElementById('f-note');
+  const fPhoto = document.getElementById('f-photo');
+  const fPhotoPreview = document.getElementById('f-photo-preview');
+  const fPhotoImg = document.getElementById('f-photo-img');
+  const fPhotoRemove = document.getElementById('f-photo-remove');
+  let pendingPhoto = undefined; // undefined = no change, null = removed, string = new dataURL
+
+  function resizeImage(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 900;
+          const scale = Math.min(1, maxW / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  fPhoto.addEventListener('change', async () => {
+    const file = fPhoto.files[0];
+    if(!file) return;
+    try{
+      const dataUrl = await resizeImage(file);
+      pendingPhoto = dataUrl;
+      fPhotoImg.src = dataUrl;
+      fPhotoPreview.style.display = 'block';
+    }catch(e){
+      console.error(e);
+      showToast('No se pudo cargar la foto.');
+    }
+  });
+
+  fPhotoRemove.addEventListener('click', () => {
+    pendingPhoto = null;
+    fPhoto.value = '';
+    fPhotoPreview.style.display = 'none';
+  });
+  let editingId = null;
+
+  function openForm(){
+    editingId = null;
+    pendingPhoto = undefined;
+    fPhoto.value = '';
+    fPhotoPreview.style.display = 'none';
+    document.getElementById('form-heading').textContent = 'Nuevo recuerdo';
+    fTitle.value=''; fDate.value = new Date().toISOString().slice(0,10); fNote.value='';
+    formOverlay.classList.add('show'); setTimeout(()=>fTitle.focus(),50);
+  }
+
+  function openEditForm(mem){
+    editingId = mem.id;
+    pendingPhoto = undefined;
+    fPhoto.value = '';
+    document.getElementById('form-heading').textContent = 'Editar recuerdo';
+    fTitle.value = mem.title;
+    fDate.value = mem.date || new Date().toISOString().slice(0,10);
+    fNote.value = mem.note || '';
+    if(mem.photo){
+      fPhotoImg.src = mem.photo;
+      fPhotoPreview.style.display = 'block';
+    } else {
+      fPhotoPreview.style.display = 'none';
+    }
+    viewOverlay.classList.remove('show');
+    formOverlay.classList.add('show');
+    setTimeout(()=>fTitle.focus(),50);
+  }
+  document.getElementById('f-cancel').addEventListener('click', () => {
+    formOverlay.classList.remove('show'); pendingLatLng = null; editingId = null;
+  });
+  document.getElementById('f-save').addEventListener('click', async () => {
+    const title = fTitle.value.trim();
+    if(!title){ fTitle.focus(); return; }
+    let savedMem;
+    if(editingId){
+      const mem = memories.find(m => m.id === editingId);
+      if(mem){
+        mem.title = title;
+        mem.date = fDate.value;
+        mem.note = fNote.value.trim();
+        if(pendingPhoto === null) mem.photo = null;
+        else if(pendingPhoto !== undefined) mem.photo = pendingPhoto;
+      }
+      savedMem = mem;
+      editingId = null;
+    } else {
+      if(!pendingLatLng) return;
+      const newMem = {
+        id: 'm'+Date.now(), lat:pendingLatLng.lat, lng:pendingLatLng.lng,
+        title, date: fDate.value, note: fNote.value.trim()
+      };
+      if(pendingPhoto) newMem.photo = pendingPhoto;
+      memories.push(newMem);
+      savedMem = newMem;
+    }
+    pendingPhoto = undefined;
+    await upsertMemory(savedMem);
+    rebuildMap();
+    formOverlay.classList.remove('show');
+    pendingLatLng = null;
+    showToast('Recuerdo guardado');
+  });
+
+  const viewOverlay = document.getElementById('view-overlay');
+  function openView(id){
+    const mem = memories.find(m => m.id===id); if(!mem) return; activeId = id;
+    document.getElementById('v-title').textContent = mem.title;
+    document.getElementById('v-date').textContent = fmtDate(mem.date);
+    const vPhoto = document.getElementById('v-photo');
+    if(mem.photo){ vPhoto.src = mem.photo; vPhoto.style.display = 'block'; }
+    else { vPhoto.style.display = 'none'; }
+    document.getElementById('v-note').textContent = mem.note || '';
+    viewOverlay.classList.add('show');
+  }
+  document.getElementById('v-edit').addEventListener('click', () => {
+    const mem = memories.find(m => m.id === activeId);
+    if(mem) openEditForm(mem);
+  });
+  document.getElementById('v-close').addEventListener('click', () => { viewOverlay.classList.remove('show'); activeId=null; });
+  document.getElementById('v-delete').addEventListener('click', async () => {
+    if(!activeId) return;
+    const idToDelete = activeId;
+    memories = memories.filter(m => m.id !== idToDelete);
+    await deleteMemoryRemote(idToDelete); rebuildMap();
+    viewOverlay.classList.remove('show'); activeId=null; showToast('Recuerdo eliminado');
+  });
+  [formOverlay, viewOverlay].forEach(ov => ov.addEventListener('click', (e) => {
+    if(e.target === ov){ ov.classList.remove('show'); pendingLatLng=null; activeId=null; }
+  }));
+
+  // ---------- Sonido ambiente (sintetizado, sin archivos externos) ----------
+  let audioCtx = null, ambientNodes = null, ambientPlaying = false, ambientActive = false;
+  function startAmbient(){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    ambientActive = true;
+
+    // ruido de fondo suave (viento nocturno, brown-noise filtrado)
+    const bufferSize = 2 * audioCtx.sampleRate;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    let last = 0;
+    for(let i=0;i<bufferSize;i++){
+      const white = Math.random()*2-1;
+      last = (last + 0.02*white) / 1.02;
+      data[i] = last * 3.5;
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer; noise.loop = true;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'lowpass'; noiseFilter.frequency.value = 500;
+    const noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.045;
+    noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
+    noise.start();
+
+    // "grillos": varias voces con trinos rápidos (pulsos en ráfaga), no pitidos sueltos
+    const cricketGain = audioCtx.createGain(); cricketGain.gain.value = 1;
+    cricketGain.connect(audioCtx.destination);
+
+    function playTrill(baseFreq, pulses, pulseGap, volume){
+      const t0 = audioCtx.currentTime;
+      for(let p=0; p<pulses; p++){
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = baseFreq + (Math.random()*80-40);
+        const g = audioCtx.createGain(); g.gain.value = 0;
+        osc.connect(g); g.connect(cricketGain);
+        const t = t0 + p*pulseGap;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(volume, t+0.008);
+        g.gain.linearRampToValueAtTime(0, t+0.028);
+        osc.start(t); osc.stop(t+0.035);
+      }
+    }
+
+    // tres "voces" de grillo independientes, cada una con su propio ritmo y tono
+    const voices = [
+      { freq: 4200, pulses: 10, gap: 0.045, vol: 0.035, every: [1400, 3200] },
+      { freq: 3600, pulses: 7,  gap: 0.05,  vol: 0.028, every: [2000, 4200] },
+      { freq: 4700, pulses: 12, gap: 0.04,  vol: 0.022, every: [2600, 5000] }
+    ];
+    const timers = voices.map(v => {
+      function loop(){
+        if(!ambientActive) return;
+        playTrill(v.freq, v.pulses, v.gap, v.vol);
+        const delay = v.every[0] + Math.random()*(v.every[1]-v.every[0]);
+        setTimeout(loop, delay);
+      }
+      setTimeout(loop, Math.random()*1500);
+    });
+
+    ambientNodes = { noise };
+  }
+  function stopAmbient(){
+    if(!audioCtx) return;
+    ambientActive = false;
+    if(ambientNodes){
+      ambientNodes.noise.stop();
+    }
+    audioCtx.close();
+    audioCtx = null; ambientNodes = null;
+  }
+  const ambientBtn = document.getElementById('ambient-btn');
+  ambientBtn.addEventListener('click', () => {
+    ambientPlaying = !ambientPlaying;
+    ambientBtn.classList.toggle('playing', ambientPlaying);
+    ambientBtn.textContent = ambientPlaying ? '🌙 Sonando…' : '🌙 Sonido de noche';
+    if(ambientPlaying) startAmbient(); else stopAmbient();
+  });
+
+  // ---------- Mensaje especial cada día 19 ----------
+  const START_DATE = new Date('2026-07-19T00:00:00');
+  const SPECIAL_PHRASES = [
+    'Otro 19 más. Sigues siendo lo mejor que me ha pasado este año.',
+    'Cada 19 pienso lo mismo: qué suerte haberte encontrado esa noche.',
+    'Un mes más contigo, un mes más de esto que tenemos.',
+    'Si pudiera volver a esa noche del Mundial, la volvería a elegir mil veces.',
+    'Otro 19 en el calendario. Otro motivo para seguir mirando este mapa.'
+  ];
+  function checkSpecialDay(){
+    const now = new Date();
+    if(now.getDate() !== 19) return;
+    const months = (now.getFullYear() - START_DATE.getFullYear()) * 12 + (now.getMonth() - START_DATE.getMonth());
+    if(months < 0) return;
+    const phrase = SPECIAL_PHRASES[Math.floor(Math.random()*SPECIAL_PHRASES.length)];
+    document.getElementById('sb-count').innerHTML = months === 0
+      ? 'Hoy es <b>19</b> — el día que empezó todo'
+      : `Hoy hace <b>${months}</b> mes${months===1?'':'es'} juntos`;
+    document.getElementById('sb-phrase').textContent = phrase;
+    document.getElementById('special-banner').classList.add('show');
+  }
+  document.getElementById('sb-close').addEventListener('click', () => {
+    document.getElementById('special-banner').classList.remove('show');
+  });
+  checkSpecialDay();
+
+  await loadMemories();
+  rebuildMap();
+})();
+</script>
+</body>
+</html>
