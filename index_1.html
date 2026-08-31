@@ -374,7 +374,11 @@ const SITE_PASSWORD = '190726Em';
     Object.values(markers).forEach(m => map.removeLayer(m));
     markers = {};
     if(polyline) map.removeLayer(polyline);
-    const sorted = [...memories].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    const sorted = [...memories].sort((a,b)=> {
+      const d = (a.date||'').localeCompare(b.date||'');
+      if(d !== 0) return d;
+      return (a.id||'').localeCompare(b.id||'');
+    });
     sorted.forEach(mem => {
       const marker = L.marker([mem.lat, mem.lng], { icon: starIcon() }).addTo(map);
       marker.on('click', () => openView(mem.id));
@@ -398,8 +402,8 @@ const SITE_PASSWORD = '190726Em';
       el.innerHTML = `<div class="memnum">${idx+1}</div><div class="meminfo">
         <div class="memtitle">${escapeHtml(mem.title)}</div><div class="memdate">${fmtDate(mem.date)}</div></div>`;
       el.addEventListener('click', () => {
-        map.flyTo([mem.lat, mem.lng], 17, { duration:2.4 });
-        map.once('moveend', () => openView(mem.id));
+        map.flyTo([mem.lat, mem.lng], 17, { duration:3.5 });
+        map.once('moveend', () => setTimeout(() => openView(mem.id), 400));
       });
       list.appendChild(el);
     });
