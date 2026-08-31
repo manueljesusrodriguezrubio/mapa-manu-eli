@@ -374,7 +374,11 @@ const SITE_PASSWORD = '190726Em';
     Object.values(markers).forEach(m => map.removeLayer(m));
     markers = {};
     if(polyline) map.removeLayer(polyline);
-    const sorted = [...memories].sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+    const sorted = [...memories].sort((a,b)=> {
+      const d = (a.date||'').localeCompare(b.date||'');
+      if(d !== 0) return d;
+      return (a.id||'').localeCompare(b.id||'');
+    });
     sorted.forEach(mem => {
       const marker = L.marker([mem.lat, mem.lng], { icon: starIcon() }).addTo(map);
       marker.on('click', () => openView(mem.id));
