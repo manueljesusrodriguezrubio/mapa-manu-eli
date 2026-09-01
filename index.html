@@ -197,7 +197,7 @@
       <label>Foto (opcional)</label>
       <input type="file" id="f-photo" accept="image/*">
       <div id="f-photo-preview" style="margin-top:10px;display:none;">
-        <img id="f-photo-img" style="width:100%;max-height:220px;object-fit:cover;border-radius:4px;display:block;">
+        <img id="f-photo-img" style="width:100%;max-height:280px;object-fit:contain;background:#0a1220;border-radius:4px;display:block;">
         <button type="button" class="btn btn-ghost" id="f-photo-remove" style="margin-top:8px;">Quitar foto</button>
       </div>
     </div>
@@ -211,7 +211,7 @@
   <div class="modal">
     <h2 id="v-title"></h2>
     <div class="view-date" id="v-date"></div>
-    <img id="v-photo" style="width:100%;max-height:260px;object-fit:cover;border-radius:4px;margin-bottom:14px;display:none;">
+    <img id="v-photo" style="width:100%;max-height:320px;object-fit:contain;background:#0a1220;border-radius:4px;margin-bottom:14px;display:none;">
     <div class="view-note" id="v-note"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="v-delete">Eliminar</button>
@@ -351,6 +351,7 @@ const SITE_PASSWORD = '190726Em';
   }
   function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
 
+  // ---------- Pan / zoom ----------
   const worldBounds = L.latLngBounds([-85,-260],[85,260]);
   const map = L.map('map', {
     zoomControl:false,
@@ -442,7 +443,6 @@ const SITE_PASSWORD = '190726Em';
     hint.textContent = 'Toca el mapa donde debería estar de verdad';
     map.getContainer().style.cursor = 'crosshair';
   });
-
   const formOverlay = document.getElementById('form-overlay');
   const fTitle = document.getElementById('f-title'), fDate = document.getElementById('f-date'), fNote = document.getElementById('f-note');
   const fPhoto = document.getElementById('f-photo');
