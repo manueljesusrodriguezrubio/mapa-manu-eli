@@ -27,6 +27,14 @@
   #signature{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;
     color:var(--gold-dim);letter-spacing:1px;margin-top:10px;}
   #signature .amp{color:var(--gold);}
+  #moon-phase{display:flex;align-items:center;gap:10px;margin-top:12px;
+    padding-top:10px;border-top:1px dashed rgba(230,183,104,0.2);}
+  #moon-phase img{width:38px;height:38px;border-radius:50%;
+    box-shadow:0 0 14px 3px rgba(230,183,104,0.45), 0 0 3px rgba(255,255,255,0.6);}
+  #moon-phase .moon-label{font-family:'Cormorant Garamond',serif;font-style:italic;
+    font-size:14px;color:var(--gold);line-height:1.3;}
+  #moon-phase .moon-sub{font-size:10px;color:var(--cream-dim);letter-spacing:0.4px;
+    text-transform:uppercase;display:block;margin-top:1px;}
   #ambient-btn{width:100%;padding:10px;margin-top:10px;background:transparent;
     border:1px solid var(--line);color:var(--cream-dim);font-family:'Manrope',sans-serif;
     font-weight:500;font-size:12px;border-radius:3px;cursor:pointer;transition:all 0.25s;}
@@ -88,6 +96,37 @@
     background-size:100% 100%;
   }
   .leaflet-tile-pane{filter:invert(1) hue-rotate(190deg) brightness(0.82) contrast(1) saturate(0.55);}
+
+  #shooting-stars{position:absolute;inset:0;pointer-events:none;z-index:450;overflow:hidden;}
+  .shooting-star{
+    position:absolute;width:14px;height:14px;
+    opacity:0;
+    offset-rotate:auto;
+  }
+  .shooting-star .ss-head{
+    position:absolute;inset:0;
+    background:linear-gradient(135deg,#fff,#f2e4c2);
+    clip-path:polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    filter:drop-shadow(0 0 8px rgba(255,255,255,0.95)) drop-shadow(0 0 16px rgba(230,183,104,0.6));
+  }
+  .shooting-star .ss-tail{
+    position:absolute;top:50%;right:0;width:260px;height:2.5px;
+    background:linear-gradient(to left, rgba(255,255,255,0.95), rgba(230,183,104,0.45) 30%, transparent 88%);
+    transform:translateY(-50%);
+    border-radius:50%;
+    filter:blur(0.6px);
+  }
+  @keyframes shoot{
+    0%{opacity:0;offset-distance:0%;}
+    6%{opacity:1;}
+    92%{opacity:1;}
+    100%{opacity:0;offset-distance:100%;}
+  }
+  .constellation-line{animation:twinkle-line 4s ease-in-out infinite;}
+  @keyframes twinkle-line{
+    0%,100%{opacity:0.3;}
+    50%{opacity:0.75;}
+  }
   .star-pin{filter:drop-shadow(0 0 5px rgba(230,183,104,0.9));}
   .overlay{position:fixed;inset:0;background:rgba(6,10,18,0.7);backdrop-filter:blur(3px);
     display:none;align-items:center;justify-content:center;z-index:1000;}
@@ -114,6 +153,21 @@
     padding:10px 20px;border-radius:20px;font-size:12.5px;opacity:0;pointer-events:none;
     transition:all 0.3s;z-index:2000;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #welcome-screen{
+    position:fixed;inset:0;z-index:4500;background:#05070d;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;opacity:0;pointer-events:none;
+    transition:opacity 1.1s ease;
+  }
+  #welcome-screen.show{opacity:1;pointer-events:auto;transition:opacity 0.05s ease;}
+  #welcome-text{
+    font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;
+    font-size:28px;color:var(--gold);text-align:center;max-width:80vw;line-height:1.6;
+    letter-spacing:0.5px;
+  }
+  #welcome-text::after{content:'|';animation:blink 0.9s steps(1) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+
   #lock-screen{
     position:fixed;inset:0;z-index:5000;background:#0a1220;
     display:flex;align-items:center;justify-content:center;
@@ -154,6 +208,9 @@
 </style>
 </head>
 <body>
+<div id="welcome-screen">
+  <div id="welcome-text"></div>
+</div>
 <div id="lock-screen">
   <div id="lock-box">
     <div id="lock-title">Nuestro Mapa</div>
@@ -174,6 +231,7 @@
       <h1>Nuestro Mapa</h1>
       <div id="subtitle">Cada punto es un sitio. Cada línea, el hilo que nos une.</div>
       <div id="signature">Manu <span class="amp">♥</span> Eli · desde el 19 de julio de 2026</div>
+      <div id="moon-phase"></div>
     </div>
     <div id="memlist"></div>
     <div id="sidebar-footer">
@@ -183,6 +241,7 @@
     </div>
   </div>
   <div id="map">
+    <div id="shooting-stars"></div>
     <div id="map-watermark">Manu ♥ Eli</div>
   </div>
 </div>
@@ -227,6 +286,26 @@
 
 <script>
 const SITE_PASSWORD = '190726Em';
+const WELCOME_PHRASE = 'Este es nuestro mapa, y en él vive cada estrella que ya somos: cada sitio, cada risa, cada noche que ya nos pertenece. Y nos queda un cielo entero por completar, con todas las que aún nos falten por ser. Siempre juntos, pase lo que pase.';
+
+function showWelcome(){
+  const screen = document.getElementById('welcome-screen');
+  const textEl = document.getElementById('welcome-text');
+  screen.classList.add('show');
+  textEl.textContent = '';
+  let i = 0;
+  const typer = setInterval(() => {
+    textEl.textContent = WELCOME_PHRASE.slice(0, i+1);
+    i++;
+    if(i >= WELCOME_PHRASE.length){
+      clearInterval(typer);
+      setTimeout(dismiss, 2800);
+    }
+  }, 45);
+  const dismiss = () => screen.classList.remove('show');
+  screen.addEventListener('click', dismiss, { once:true });
+}
+
 (function(){
   const lockScreen = document.getElementById('lock-screen');
   const lockInput = document.getElementById('lock-input');
@@ -240,6 +319,7 @@ const SITE_PASSWORD = '190726Em';
     if(lockInput.value === SITE_PASSWORD){
       sessionStorage.setItem('unlocked', 'yes');
       lockScreen.style.display = 'none';
+      showWelcome();
     } else {
       lockError.textContent = 'Contraseña incorrecta';
       lockInput.value = '';
@@ -386,7 +466,7 @@ const SITE_PASSWORD = '190726Em';
       markers[mem.id] = marker;
     });
     if(sorted.length > 1){
-      polyline = L.polyline(sorted.map(m => [m.lat,m.lng]), { color:'#e6b768', weight:1.2, opacity:0.45, dashArray:'2,8' }).addTo(map);
+      polyline = L.polyline(sorted.map(m => [m.lat,m.lng]), { color:'#e6b768', weight:2.4, opacity:0.7, dashArray:'3,7', className:'constellation-line' }).addTo(map);
     }
     renderList(sorted);
   }
@@ -590,6 +670,7 @@ const SITE_PASSWORD = '190726Em';
   let audioCtx = null, ambientNodes = null, ambientPlaying = false, ambientActive = false;
   function startAmbient(){
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
     ambientActive = true;
 
     // ruido de fondo suave (viento nocturno, brown-noise filtrado)
@@ -690,6 +771,87 @@ const SITE_PASSWORD = '190726Em';
     document.getElementById('special-banner').classList.remove('show');
   });
   checkSpecialDay();
+
+  // ---------- Fase lunar real de hoy ----------
+  function moonPhaseInfo(date){
+    const knownNewMoon = Date.UTC(2000,0,6,18,14,0);
+    const synodicMonth = 29.53058867;
+    const diffDays = (date.getTime() - knownNewMoon) / 86400000;
+    let phase = (diffDays % synodicMonth) / synodicMonth;
+    if(phase < 0) phase += 1;
+    const names = [
+      'Luna nueva','Luna creciente','Cuarto creciente','Gibosa creciente',
+      'Luna llena','Gibosa menguante','Cuarto menguante','Luna menguante'
+    ];
+    const idx = Math.floor(phase*8) % 8;
+    return { phase, name: names[idx] };
+  }
+
+  function drawMoonImage(phase, size){
+    const c = document.createElement('canvas'); c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const r = size/2;
+    ctx.save();
+    ctx.translate(r, r);
+    ctx.beginPath(); ctx.arc(0,0,r-1,0,Math.PI*2); ctx.clip();
+
+    // base oscura
+    ctx.fillStyle = '#12141c';
+    ctx.fillRect(-r, -r, size, size);
+
+    // parte iluminada, dorada/crema
+    ctx.fillStyle = '#f2e4c2';
+    ctx.beginPath();
+    const rx = Math.abs(Math.cos(phase*Math.PI*2)) * (r-1);
+    if(phase < 0.5){
+      ctx.arc(0, 0, r-1, -Math.PI/2, Math.PI/2, false);
+      ctx.ellipse(0, 0, rx, r-1, 0, Math.PI/2, -Math.PI/2, phase < 0.25);
+    } else {
+      ctx.arc(0, 0, r-1, -Math.PI/2, Math.PI/2, true);
+      ctx.ellipse(0, 0, rx, r-1, 0, Math.PI/2, -Math.PI/2, phase >= 0.75);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // sombreado sutil de cráteres, muy discreto
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(size*0.62, size*0.4, size*0.09, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(size*0.4, size*0.62, size*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+
+    return c.toDataURL();
+  }
+
+  const moon = moonPhaseInfo(new Date());
+  document.getElementById('moon-phase').innerHTML =
+    `<img src="${drawMoonImage(moon.phase, 96)}" alt="${moon.name}">
+     <div class="moon-label">${moon.name}<span class="moon-sub">de hoy</span></div>`;
+
+  // ---------- Estrellas fugaces, de vez en cuando ----------
+  function launchShootingStar(){
+    const layer = document.getElementById('shooting-stars');
+    if(!layer) return;
+    const star = document.createElement('div');
+    star.className = 'shooting-star';
+    star.innerHTML = '<div class="ss-tail"></div><div class="ss-head"></div>';
+    star.style.top = (Math.random()*35) + '%';
+    star.style.left = (55 + Math.random()*35) + '%';
+    const dx1 = -(220 + Math.random()*100), dy1 = 90 + Math.random()*60;
+    const dx2 = -(520 + Math.random()*160), dy2 = 380 + Math.random()*160;
+    star.style.offsetPath = `path('M0,0 Q ${dx1},${dy1} ${dx2},${dy2}')`;
+    star.style.animation = `shoot ${1.5 + Math.random()*0.6}s ease-in forwards`;
+    layer.appendChild(star);
+    setTimeout(() => star.remove(), 2600);
+  }
+  function scheduleShootingStars(){
+    const delay = 5000 + Math.random()*9000;
+    setTimeout(() => { launchShootingStar(); scheduleShootingStars(); }, delay);
+  }
+  setTimeout(launchShootingStar, 1500);
+  scheduleShootingStars();
 
   await loadMemories();
   rebuildMap();
