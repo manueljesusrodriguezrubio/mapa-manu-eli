@@ -213,6 +213,32 @@
     #moon-phase .moon-label{font-size:12px;}
     #moon-phase .moon-sub{font-size:9px;}
   }
+
+  #lock-forgot{display:block;margin-top:16px;background:none;border:none;color:var(--cream-dim);
+    font-family:'Manrope',sans-serif;font-size:12px;cursor:pointer;text-decoration:underline;}
+  #lock-forgot:hover{color:var(--gold);}
+  #forgot-screen{position:fixed;inset:0;z-index:5100;display:none;align-items:center;justify-content:center;
+    background:rgba(10,18,32,0.97);padding:16px;}
+  #forgot-screen.show{display:flex;}
+  #forgot-box{width:380px;max-width:92vw;max-height:92vh;overflow-y:auto;text-align:center;padding:34px 26px;
+    background:#0f1a2c;border:1px solid var(--line);border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+  #fg-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:600;font-size:26px;color:var(--gold);margin-bottom:10px;}
+  #fg-text{font-size:14px;line-height:1.5;color:var(--cream);margin-bottom:18px;}
+  #fg-progress{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cream-dim);margin-bottom:10px;}
+  .fg-opt{display:block;width:100%;margin-bottom:10px;padding:12px 14px;background:#0a1220;color:var(--cream);
+    border:1px solid var(--line);border-radius:4px;font-family:'Manrope',sans-serif;font-size:14px;cursor:pointer;
+    transition:border-color 0.2s, background 0.2s;}
+  .fg-opt:hover{border-color:var(--gold-dim);}
+  .fg-opt.ok{border-color:#6fbf8a;background:rgba(111,191,138,0.12);}
+  .fg-opt.bad{border-color:var(--danger);background:rgba(220,90,90,0.12);}
+  #fg-msg{font-size:13px;min-height:18px;margin-top:6px;color:var(--danger);}
+  #fg-pass{font-family:'Cormorant Garamond',serif;font-size:34px;color:var(--gold);letter-spacing:3px;margin:12px 0 16px;}
+  .fg-btn{width:100%;padding:12px;background:var(--gold);color:var(--ink);border:none;border-radius:4px;
+    font-family:'Manrope',sans-serif;font-weight:600;font-size:13px;cursor:pointer;margin-top:6px;}
+  .fg-cancel{background:none;border:none;color:var(--cream-dim);font-family:'Manrope',sans-serif;font-size:12px;
+    cursor:pointer;margin-top:14px;text-decoration:underline;}
+  @keyframes fgshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  .fg-shake{animation:fgshake 0.35s;}
 </style>
 </head>
 <body>
@@ -226,6 +252,13 @@
     <input type="password" id="lock-input" placeholder="Contraseña" autocomplete="off">
     <button id="lock-btn">Entrar</button>
     <div id="lock-error"></div>
+    <button id="lock-forgot" type="button">¿Has olvidado tu contraseña?</button>
+  </div>
+</div>
+<div id="forgot-screen">
+  <div id="forgot-box">
+    <div id="fg-title">Contraseña olvidada</div>
+    <div id="fg-body"></div>
   </div>
 </div>
 <div id="special-banner">
@@ -873,6 +906,96 @@ function showWelcome(){
 
   await loadMemories();
   rebuildMap();
+})();
+</script>
+
+<script>
+(function(){
+  const QUESTIONS = [
+    { q:'¿Dónde nos conocimos?',
+      opts:['En una discoteca','Por una aplicación','En la piscina','En el gimnasio'], ok:2,
+      fail:'Ni discoteca, ni pantalla, ni gimnasio... Eli, cariño, esa respuesta me ha dolido.' },
+    { q:'¿Qué vimos juntos la noche en que empezó todo?',
+      opts:['La final del Mundial','Una peli de miedo','Un partido de tenis','Una serie en el sofá'], ok:0,
+      fail:'Eso no pasó. Concéntrate, que te estás jugando la contraseña.' },
+    { q:'¿Cuál fue nuestra primera cena juntos?',
+      opts:['Una hamburguesa','Pizza','Sushi','Unos tacos'], ok:1,
+      fail:'Error. La primera cena de todas, Eli... ¡y la pizza se te ha olvidado!' },
+    { q:'¿Qué comimos justo antes de nuestro primer beso?',
+      opts:['Sushi','Pizza','Una hamburguesa','Una tortilla'], ok:2,
+      fail:'Incorrecto. Que no te acuerdes de eso es casi delito.' },
+    { q:'¿En qué pueblo de la Alpujarra estaba nuestro apartamento?',
+      opts:['Trevélez','Pampaneira','Capileira','Carataunas'], ok:3,
+      fail:'Casi... pero casi no cuenta. Vuelta a empezar.' },
+    { q:'¿Qué día exacto fue nuestro primer beso?',
+      opts:['El 2 de agosto','El 3 de agosto','El 4 de agosto','El 6 de agosto'], ok:1,
+      fail:'Fallo. Esa fecha debería estar grabada a fuego en tu memoria.' }
+  ];
+  const screen = document.getElementById('forgot-screen');
+  const box = document.getElementById('forgot-box');
+  const body = document.getElementById('fg-body');
+  let step = 0, fails = 0, locked = false;
+
+  function open(){ screen.classList.add('show'); step = 0; fails = 0; intro(); }
+  function close(){ screen.classList.remove('show'); }
+
+  function intro(){
+    body.innerHTML = '<div id="fg-text">Vaya, la señorita ha perdido la contraseña de nuestro mapa.<br><br>' +
+      'Para recuperarla tendrás que demostrar que eres la Eli de verdad. <b>6 preguntas.</b> ' +
+      'Si fallas una, castigo: vuelta a empezar.</div>' +
+      '<button class="fg-btn" id="fg-start">Acepto el castigo</button>' +
+      '<br><button class="fg-cancel" id="fg-cancel">Mejor no, me acuerdo yo</button>';
+    document.getElementById('fg-start').onclick = ask;
+    document.getElementById('fg-cancel').onclick = close;
+  }
+
+  function ask(){
+    locked = false;
+    const Q = QUESTIONS[step];
+    body.innerHTML = '<div id="fg-progress">Pregunta ' + (step+1) + ' de ' + QUESTIONS.length + '</div>' +
+      '<div id="fg-text"></div><div id="fg-opts"></div><div id="fg-msg"></div>';
+    document.getElementById('fg-text').textContent = Q.q;
+    const wrap = document.getElementById('fg-opts');
+    Q.opts.forEach((t, i) => {
+      const b = document.createElement('button');
+      b.className = 'fg-opt'; b.type = 'button'; b.textContent = t;
+      b.onclick = () => answer(i, b);
+      wrap.appendChild(b);
+    });
+  }
+
+  function answer(i, btn){
+    if(locked) return;
+    const Q = QUESTIONS[step];
+    locked = true;
+    if(i === Q.ok){
+      btn.classList.add('ok');
+      setTimeout(() => { step++; step >= QUESTIONS.length ? win() : ask(); }, 700);
+    } else {
+      fails++;
+      btn.classList.add('bad');
+      document.getElementById('fg-msg').textContent = Q.fail;
+      box.classList.remove('fg-shake'); void box.offsetWidth; box.classList.add('fg-shake');
+      setTimeout(() => { step = 0; body.innerHTML = '<div id="fg-text">Castigo: vuelta a empezar desde la primera.</div>'; setTimeout(ask, 2200); }, 3500);
+    }
+  }
+
+  function win(){
+    const msg = fails === 0
+      ? 'Pleno a la primera, vale. Pero que se te olvide la contraseña de NUESTRO mapa, con lo que me ha costado hacerlo... Por esta vez te libras, señorita.'
+      : 'Lo has conseguido tras ' + fails + (fails === 1 ? ' fallo' : ' fallos') + '. Y mira que olvidarte la contraseña de NUESTRO mapa, con las noches que me ha costado hacerlo... Cada fallo se paga con un beso: me debes ' + fails + (fails === 1 ? ' beso' : ' besos') + '. Apúntatela bien, que la próxima no seré tan bueno.';
+    body.innerHTML = '<div id="fg-text">' + msg + '<br><br>Tu contraseña es:</div>' +
+      '<div id="fg-pass"></div>' +
+      '<button class="fg-btn" id="fg-enter">Volver a entrar</button>';
+    document.getElementById('fg-pass').textContent = SITE_PASSWORD;
+    document.getElementById('fg-enter').onclick = () => {
+      close();
+      const inp = document.getElementById('lock-input');
+      inp.value = SITE_PASSWORD; inp.focus();
+    };
+  }
+
+  document.getElementById('lock-forgot').addEventListener('click', open);
 })();
 </script>
 </body>
